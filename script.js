@@ -214,7 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             currentSocket.send(JSON.stringify(messageData));
             messageInput.value = '';
-            appendMessage(username, messageText);
+            
+            // Only show message immediately in public chat
+            // For secret/P2P chats, wait for server echo
+            if (!isSecretChat && !isP2P) {
+                appendMessage(username, messageText);
+            }
         }
     };
 
