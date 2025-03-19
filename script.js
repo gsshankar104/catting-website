@@ -14,40 +14,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRoom = '';
     let username = '';
 
-    // Demo mode - simulated chat without WebSocket
-    let messages = [];
-    const simulatedSocket = {
-        send: (data) => {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'message') {
-                setTimeout(() => {
-                    messages.push({
-                        username: parsed.username,
-                        message: parsed.message,
-                        timestamp: new Date().toLocaleTimeString()
-                    });
-                    appendMessage(parsed.username, parsed.message);
-                }, 100);
-            }
-        }
-    };
-    const socket = simulatedSocket;
+    // Initialize WebSocket connection
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : window.location.host;
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}`);
 
     // WebSocket event handlers
-    socket.addEventListener('open', () => {
+    socket.onopen = () => {
         console.log('Connected to WebSocket server');
-    });
+    };
 
-    socket.addEventListener('close', () => {
+    socket.onclose = () => {
         console.log('Disconnected from WebSocket server');
-        messagesDiv.innerHTML += '<div class="message">Disconnected from server. Please refresh the page.</div>';
-    });
+        messagesDiv.innerHTML += '<div class="message system-message">Disconnected from server. Please refresh the page.</div>';
+    };
 
-    socket.addEventListener('error', (error) => {
+    socket.onerror = (error) => {
         console.error('WebSocket error:', error);
-    });
+    };
 
-    socket.addEventListener('message', (event) => {
+    socket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
             if (data.room === currentRoom) {
@@ -56,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error parsing message:', error);
         }
-    });
+    };
 
     // Event Listeners
     enterChatButton.addEventListener('click', () => {
@@ -75,10 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Room selection using buttons
     chatRoomsList.addEventListener('click', (event) => {
-        if (event.target.tagName === 'A') {
-            event.preventDefault();
+        if (event.target.classList.contains('room-button')) {
             currentRoom = event.target.dataset.room;
+            const roomName = event.target.textContent;
             
             chatRoomSelection.classList.remove('slide-in');
             chatRoomSelection.classList.add('slide-out');
@@ -97,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 socket.send(JSON.stringify(joinMessage));
                 
                 // Display welcome message
-                messagesDiv.innerHTML = `<div class="message">Welcome to the ${currentRoom} chat room!</div>`;
+                messagesDiv.innerHTML = `<div class="message system-message">Welcome to the ${roomName}!</div>`;
             }, 300);
         }
     });
