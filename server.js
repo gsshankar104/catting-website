@@ -85,20 +85,8 @@ wss.on('connection', (ws) => {
     }
 
     function handleMessage(message) {
-        if (isP2P) {
-            // For P2P chats, send directly to the other peer
-            const peers = p2pConnections.get(userRoom);
-            if (peers) {
-                peers.forEach(peer => {
-                    if (peer !== ws && peer.readyState === WebSocket.OPEN) {
-                        peer.send(JSON.stringify(message));
-                    }
-                });
-            }
-        } else {
-            // For public and secret rooms
-            broadcastToRoom(message.room, message);
-        }
+        const roomMap = isSecretChat ? secretRooms : isP2P ? p2pConnections : rooms;
+        broadcastToRoom(message.room, message, roomMap);
     }
 
     function handleCreateSecret() {
@@ -119,12 +107,13 @@ wss.on('connection', (ws) => {
             secretRooms.get(roomId).add(ws);
             isSecretChat = true;
             userRoom = roomId;
+            username = message.username;
             
             broadcastToRoom(roomId, {
                 type: 'message',
                 room: roomId,
                 username: 'System',
-                message: `${message.username} has joined the secret chat`
+                message: `${username} has joined the secret chat`
             }, secretRooms);
         } else {
             ws.send(JSON.stringify({
