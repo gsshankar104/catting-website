@@ -14,10 +14,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRoom = '';
     let username = '';
 
-    // Initialize WebSocket connection
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}`);
+    // Demo mode - simulated chat without WebSocket
+    let messages = [];
+    const simulatedSocket = {
+        send: (data) => {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'message') {
+                setTimeout(() => {
+                    messages.push({
+                        username: parsed.username,
+                        message: parsed.message,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+                    appendMessage(parsed.username, parsed.message);
+                }, 100);
+            }
+        }
+    };
+    const socket = simulatedSocket;
 
     // WebSocket event handlers
     socket.addEventListener('open', () => {
