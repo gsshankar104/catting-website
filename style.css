@@ -120,6 +120,21 @@ button:hover {
     margin-right: 8px;
 }
 
+.system-message {
+    background-color: #f0f0f0;
+    color: #666;
+    font-style: italic;
+    text-align: center;
+}
+
+.demo-notice {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+}
+
 .message-input-container {
     display: flex;
     gap: 10px;
