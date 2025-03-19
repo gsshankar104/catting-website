@@ -3,18 +3,23 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const crypto = require('crypto');
+const url = require('url');
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+
+// Create separate WebSocket servers for different chat types
+const publicWss = new WebSocket.Server({ noServer: true });
+const secretWss = new WebSocket.Server({ noServer: true });
+const p2pWss = new WebSocket.Server({ noServer: true });
 
 // Serve static files
 app.use(express.static(__dirname));
 
 // Store active rooms and their users
-const rooms = new Map();
+const publicRooms = new Map();
 const secretRooms = new Map();
-const p2pConnections = new Map();
+const p2pRooms = new Map();
 
 const PORT = process.env.PORT || 3000;
 
@@ -28,12 +33,48 @@ function generateInviteCode() {
     return crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
-wss.on('connection', (ws) => {
-    console.log('Client connected');
+// Handle different WebSocket connections based on path
+server.on('upgrade', (request, socket, head) => {
+    const pathname = url.parse(request.url).pathname;
+
+    if (pathname === '/public') {
+        publicWss.handleUpgrade(request, socket, head, (ws) => {
+            publicWss.emit('connection', ws, request);
+        });
+    } else if (pathname === '/secret') {
+        secretWss.handleUpgrade(request, socket, head, (ws) => {
+            secretWss.emit('connection', ws, request);
+        });
+    } else if (pathname === '/p2p') {
+        p2pWss.handleUpgrade(request, socket, head, (ws) => {
+            p2pWss.emit('connection', ws, request);
+        });
+    } else {
+        socket.destroy();
+    }
+});
+
+// Handle public chat connections
+publicWss.on('connection', (ws) => {
+    console.log('Client connected to public chat');
+    handleConnection(ws, publicRooms);
+});
+
+// Handle secret chat connections
+secretWss.on('connection', (ws) => {
+    console.log('Client connected to secret chat');
+    handleConnection(ws, secretRooms);
+});
+
+// Handle P2P chat connections
+p2pWss.on('connection', (ws) => {
+    console.log('Client connected to P2P chat');
+    handleConnection(ws, p2pRooms);
+});
+
+function handleConnection(ws, roomMap) {
     let userRoom = '';
     let username = '';
-    let isSecretChat = false;
-    let isP2P = false;
 
     ws.on('message', (data) => {
         try {
@@ -41,22 +82,22 @@ wss.on('connection', (ws) => {
             
             switch (message.type) {
                 case 'join':
-                    handleJoin(message);
+                    handleJoin(ws, message, roomMap);
                     break;
                 case 'message':
-                    handleMessage(message);
+                    handleMessage(ws, message, roomMap);
                     break;
                 case 'create_secret':
-                    handleCreateSecret();
+                    handleCreateSecret(ws);
                     break;
                 case 'join_secret':
-                    handleJoinSecret(message);
+                    handleJoinSecret(ws, message);
                     break;
                 case 'create_p2p':
-                    handleCreateP2P();
+                    handleCreateP2P(ws);
                     break;
                 case 'join_p2p':
-                    handleJoinP2P(message);
+                    handleJoinP2P(ws, message);
                     break;
             }
         } catch (error) {
@@ -64,73 +105,37 @@ wss.on('connection', (ws) => {
         }
     });
 
-    function handleJoin(message) {
+    function handleJoin(ws, message, roomMap) {
         userRoom = message.room;
         username = message.username;
-        isSecretChat = !!message.isSecret;
-        isP2P = !!message.isP2P;
 
-        if (!isSecretChat && !isP2P) {
-            if (!rooms.has(userRoom)) {
-                rooms.set(userRoom, new Set());
-            }
-            rooms.get(userRoom).add(ws);
-            
-            // Send join message only for public rooms
-            broadcastToRoom(userRoom, {
-                type: 'message',
-                room: userRoom,
-                username: 'System',
-                message: `${username} has joined the chat`
-            }, rooms);
+        if (!roomMap.has(userRoom)) {
+            roomMap.set(userRoom, new Set());
         }
+        roomMap.get(userRoom).add(ws);
+        
+        broadcastToRoom(userRoom, {
+            type: 'message',
+            room: userRoom,
+            username: 'System',
+            message: `${username} has joined the chat`
+        }, roomMap);
     }
 
-    function handleMessage(message) {
-        let targetRoomMap;
-        // Determine the room type from the message itself
-        if (message.isSecret) {
-            targetRoomMap = secretRooms;
-            console.log('Secret message:', { room: message.room, map: 'secretRooms' });
-        } else if (message.isP2P) {
-            targetRoomMap = p2pConnections;
-            console.log('P2P message:', { room: message.room, map: 'p2pConnections' });
-        } else {
-            targetRoomMap = rooms;
-            console.log('Public message:', { room: message.room, map: 'rooms' });
-        }
-
-        // Only broadcast if the room exists in the correct map
-        if (targetRoomMap && targetRoomMap.has(message.room)) {
-            console.log('Broadcasting to room:', {
-                room: message.room,
-                type: message.isSecret ? 'secret' : message.isP2P ? 'p2p' : 'public',
-                clients: targetRoomMap.get(message.room).size
-            });
-            
-            // Create a new message object with all necessary properties
-            const broadcastMessage = {
+    function handleMessage(ws, message, roomMap) {
+        if (roomMap.has(message.room)) {
+            broadcastToRoom(message.room, {
                 type: 'message',
                 room: message.room,
                 username: message.username,
-                message: message.message,
-                isSecret: message.isSecret,
-                isP2P: message.isP2P
-            };
-
-            broadcastToRoom(message.room, broadcastMessage, targetRoomMap);
-        } else {
-            console.log('Room not found:', {
-                room: message.room,
-                type: message.isSecret ? 'secret' : message.isP2P ? 'p2p' : 'public'
-            });
+                message: message.message
+            }, roomMap);
         }
     }
 
-    function handleCreateSecret() {
+    function handleCreateSecret(ws) {
         const roomId = generateRoomId();
         secretRooms.set(roomId, new Set([ws]));
-        isSecretChat = true;
         userRoom = roomId;
 
         ws.send(JSON.stringify({
@@ -139,11 +144,10 @@ wss.on('connection', (ws) => {
         }));
     }
 
-    function handleJoinSecret(message) {
+    function handleJoinSecret(ws, message) {
         const roomId = message.roomId;
         if (secretRooms.has(roomId)) {
             secretRooms.get(roomId).add(ws);
-            isSecretChat = true;
             userRoom = roomId;
             username = message.username;
 
@@ -151,8 +155,7 @@ wss.on('connection', (ws) => {
                 type: 'message',
                 room: roomId,
                 username: 'System',
-                message: `${username} has joined the secret chat`,
-                isSecret: true
+                message: `${username} has joined the secret chat`
             }, secretRooms);
         } else {
             ws.send(JSON.stringify({
@@ -162,11 +165,10 @@ wss.on('connection', (ws) => {
         }
     }
 
-    function handleCreateP2P() {
+    function handleCreateP2P(ws) {
         const inviteCode = generateInviteCode();
         const roomId = generateRoomId();
-        p2pConnections.set(roomId, new Set([ws]));
-        isP2P = true;
+        p2pRooms.set(roomId, new Set([ws]));
         userRoom = roomId;
 
         ws.send(JSON.stringify({
@@ -176,12 +178,11 @@ wss.on('connection', (ws) => {
         }));
     }
 
-    function handleJoinP2P(message) {
-        if (p2pConnections.has(message.roomId)) {
-            const peers = p2pConnections.get(message.roomId);
+    function handleJoinP2P(ws, message) {
+        if (p2pRooms.has(message.roomId)) {
+            const peers = p2pRooms.get(message.roomId);
             if (peers.size < 2) {
                 peers.add(ws);
-                isP2P = true;
                 userRoom = message.roomId;
                 username = message.username;
 
@@ -189,9 +190,8 @@ wss.on('connection', (ws) => {
                     type: 'message',
                     room: message.roomId,
                     username: 'System',
-                    message: `${username} has joined the chat`,
-                    isP2P: true
-                }, p2pConnections);
+                    message: `${username} has joined the chat`
+                }, p2pRooms);
             } else {
                 ws.send(JSON.stringify({
                     type: 'error',
@@ -208,36 +208,25 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         console.log('Client disconnected');
-        handleDisconnect();
+        handleDisconnect(ws, roomMap);
     });
 
-    function handleDisconnect() {
+    function handleDisconnect(ws, roomMap) {
         if (!userRoom) return;
 
-        let targetRoomMap;
-        if (isSecretChat) {
-            targetRoomMap = secretRooms;
-        } else if (isP2P) {
-            targetRoomMap = p2pConnections;
-        } else {
-            targetRoomMap = rooms;
-        }
-
-        if (targetRoomMap.has(userRoom)) {
-            const room = targetRoomMap.get(userRoom);
+        if (roomMap.has(userRoom)) {
+            const room = roomMap.get(userRoom);
             room.delete(ws);
 
             if (room.size === 0) {
-                targetRoomMap.delete(userRoom);
+                roomMap.delete(userRoom);
             } else {
                 broadcastToRoom(userRoom, {
                     type: 'message',
                     room: userRoom,
                     username: 'System',
-                    message: `${username} has left the chat`,
-                    isSecret: isSecretChat,
-                    isP2P: isP2P
-                }, targetRoomMap);
+                    message: `${username} has left the chat`
+                }, roomMap);
             }
         }
     }
@@ -245,7 +234,7 @@ wss.on('connection', (ws) => {
     ws.on('error', (error) => {
         console.error('WebSocket error:', error);
     });
-});
+}
 
 function broadcastToRoom(room, message, roomMap) {
     if (!roomMap || !roomMap.has(room)) return;

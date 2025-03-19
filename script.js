@@ -31,44 +31,44 @@ document.addEventListener('DOMContentLoaded', () => {
     let username = '';
     let isSecretChat = false;
     let isP2P = false;
+    let currentSocket = null;
+
+    // Function to create a new WebSocket connection
+    function createWebSocket(type) {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : window.location.host;
+        const socket = new WebSocket(`${wsProtocol}//${wsHost}/${type}`);
+
+        socket.onopen = () => {
+            console.log(`Connected to ${type} WebSocket server`);
+        };
+
+        socket.onclose = () => {
+            console.log(`Disconnected from ${type} WebSocket server`);
+            messagesDiv.innerHTML += '<div class="message system-message">Disconnected from server. Please refresh the page.</div>';
+        };
+
+        socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            handleServerMessage(data);
+        };
+
+        return socket;
+    }
 
     // Initialize WebSocket connection
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : window.location.host;
-    const socket = new WebSocket(`${wsProtocol}//${wsHost}`);
-
-    // WebSocket event handlers
-    socket.onopen = () => {
-        console.log('Connected to WebSocket server');
-    };
-
-    socket.onclose = () => {
-        console.log('Disconnected from WebSocket server');
-        messagesDiv.innerHTML += '<div class="message system-message">Disconnected from server. Please refresh the page.</div>';
-    };
-
-    socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-    };
-
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        handleServerMessage(data);
-    };
+    let publicSocket = createWebSocket('public');
+    currentSocket = publicSocket;
 
     function handleServerMessage(data) {
         switch (data.type) {
             case 'message':
-                // Only process messages that match our current room type
-                if ((isSecretChat && data.isSecret) ||
-                    (isP2P && data.isP2P) ||
-                    (!isSecretChat && !isP2P && !data.isSecret && !data.isP2P)) {
-                    console.log('Receiving message:', {
-                        room: data.room,
-                        isSecret: data.isSecret,
-                        isP2P: data.isP2P,
-                        currentRoom: currentRoom
-                    });
+                // Only process messages that match our current room
+                if (data.room === currentRoom) {
                     appendMessage(data.username, data.message);
                 }
                 break;
@@ -90,6 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
         secretChatModal.style.display = 'flex';
         isSecretChat = true;
         currentRoom = data.roomId;
+        
+        // Switch to secret socket
+        currentSocket = createWebSocket('secret');
     }
 
     function handleP2PCreated(data) {
@@ -99,6 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
         p2pChatModal.style.display = 'flex';
         isP2P = true;
         currentRoom = data.roomId;
+        
+        // Switch to P2P socket
+        currentSocket = createWebSocket('p2p');
     }
 
     // Event Listeners
@@ -141,11 +147,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     createSecretChat.addEventListener('click', () => {
-        socket.send(JSON.stringify({ type: 'create_secret' }));
+        currentSocket = createWebSocket('secret');
+        currentSocket.onopen = () => {
+            currentSocket.send(JSON.stringify({ type: 'create_secret' }));
+        };
     });
 
     createP2PChat.addEventListener('click', () => {
-        socket.send(JSON.stringify({ type: 'create_p2p' }));
+        currentSocket = createWebSocket('p2p');
+        currentSocket.onopen = () => {
+            currentSocket.send(JSON.stringify({ type: 'create_p2p' }));
+        };
     });
 
     joinSecretChat.addEventListener('click', () => {
@@ -157,11 +169,14 @@ document.addEventListener('DOMContentLoaded', () => {
     joinP2PBtn.addEventListener('click', () => {
         const code = joinCodeInput.value.trim().toUpperCase();
         if (code) {
-            socket.send(JSON.stringify({
-                type: 'join_p2p',
-                inviteCode: code,
-                username: username
-            }));
+            currentSocket = createWebSocket('p2p');
+            currentSocket.onopen = () => {
+                currentSocket.send(JSON.stringify({
+                    type: 'join_p2p',
+                    inviteCode: code,
+                    username: username
+                }));
+            };
         }
     });
 
@@ -190,22 +205,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle sending messages
     const sendMessage = () => {
         const messageText = messageInput.value.trim();
-        if (messageText && currentRoom) {
+        if (messageText && currentRoom && currentSocket && currentSocket.readyState === WebSocket.OPEN) {
             const messageData = {
                 type: 'message',
                 room: currentRoom,
                 username: username,
-                message: messageText,
-                isSecret: isSecretChat,
-                isP2P: isP2P
+                message: messageText
             };
-            socket.send(JSON.stringify(messageData));
+            currentSocket.send(JSON.stringify(messageData));
             messageInput.value = '';
-            
-            // Show message immediately in your own window
-            if (isSecretChat || isP2P) {
-                appendMessage(username, messageText);
-            }
+            appendMessage(username, messageText);
         }
     };
 
@@ -219,8 +228,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Room joining functions
     function joinPublicRoom(roomId, roomName) {
         currentRoom = roomId;
+        isSecretChat = false;
+        isP2P = false;
+        currentSocket = publicSocket;
         switchToChat(roomName);
-        socket.send(JSON.stringify({
+        currentSocket.send(JSON.stringify({
             type: 'join',
             room: roomId,
             username: username
@@ -228,31 +240,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function joinSecretRoom(roomId) {
+        currentSocket = createWebSocket('secret');
         isSecretChat = true;
         isP2P = false;
         currentRoom = roomId;
         switchToChat('Secret Chat');
-        socket.send(JSON.stringify({
-            type: 'join_secret',
-            roomId: roomId,
-            username: username,
-            isSecret: true
-        }));
+        
+        currentSocket.onopen = () => {
+            currentSocket.send(JSON.stringify({
+                type: 'join_secret',
+                roomId: roomId,
+                username: username
+            }));
+        };
+        
         roomInfo.textContent = '🔒 This is a private chat room. Messages will be deleted when everyone leaves.';
-        // Clear any previous messages
         messagesDiv.innerHTML = '';
     }
 
     function joinP2PRoom(roomId) {
+        currentSocket = createWebSocket('p2p');
         isP2P = true;
+        isSecretChat = false;
         currentRoom = roomId;
         switchToChat('Private P2P Chat');
-        socket.send(JSON.stringify({
-            type: 'join_p2p',
-            roomId: roomId,
-            username: username
-        }));
+        
+        currentSocket.onopen = () => {
+            currentSocket.send(JSON.stringify({
+                type: 'join_p2p',
+                roomId: roomId,
+                username: username
+            }));
+        };
+        
         roomInfo.textContent = '👥 This is a peer-to-peer chat. Only you and your friend can see these messages.';
+        messagesDiv.innerHTML = '';
     }
 
     function switchToChat(roomName) {
