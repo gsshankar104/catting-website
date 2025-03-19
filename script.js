@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event Listeners
     enterChatButton.addEventListener('click', () => {
         username = usernameInput.value.trim();
+        console.log("Username entered:", username);
         if (username) {
             welcomeHeader.classList.add('slide-out');
             usernameEntry.classList.add('slide-out');
@@ -68,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target.classList.contains('room-button')) {
             currentRoom = event.target.dataset.room;
             const roomName = event.target.textContent;
+            console.log("Room selected:", currentRoom);
 
             chatRoomSelection.classList.add('slide-out');
             setTimeout(() => {
@@ -82,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle sending messages
     const sendMessage = () => {
         const messageText = messageInput.value.trim();
+        console.log("Message sending:", messageText, currentRoom);
         if (messageText && currentRoom) {
             const messageData = {
                 type: 'message',
