@@ -184,10 +184,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: 'message',
                 room: currentRoom,
                 username: username,
-                message: messageText
+                message: messageText,
+                isSecret: isSecretChat,
+                isP2P: isP2P
             };
             socket.send(JSON.stringify(messageData));
             messageInput.value = '';
+            
+            // Show message immediately in your own window
+            if (isSecretChat || isP2P) {
+                appendMessage(username, messageText);
+            }
         }
     };
 

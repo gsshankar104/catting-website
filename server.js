@@ -88,15 +88,25 @@ wss.on('connection', (ws) => {
 
     function handleMessage(message) {
         let targetRoomMap;
-        if (isSecretChat) {
+        // Determine the room type from the message itself
+        if (message.isSecret) {
             targetRoomMap = secretRooms;
-        } else if (isP2P) {
+        } else if (message.isP2P) {
             targetRoomMap = p2pConnections;
         } else {
             targetRoomMap = rooms;
         }
 
-        broadcastToRoom(message.room, message, targetRoomMap);
+        if (targetRoomMap && targetRoomMap.has(message.room)) {
+            broadcastToRoom(message.room, {
+                type: 'message',
+                room: message.room,
+                username: message.username,
+                message: message.message,
+                isSecret: message.isSecret,
+                isP2P: message.isP2P
+            }, targetRoomMap);
+        }
     }
 
     function handleCreateSecret() {
@@ -123,7 +133,8 @@ wss.on('connection', (ws) => {
                 type: 'message',
                 room: roomId,
                 username: 'System',
-                message: `${username} has joined the secret chat`
+                message: `${username} has joined the secret chat`,
+                isSecret: true
             }, secretRooms);
         } else {
             ws.send(JSON.stringify({
@@ -160,7 +171,8 @@ wss.on('connection', (ws) => {
                     type: 'message',
                     room: message.roomId,
                     username: 'System',
-                    message: `${username} has joined the chat`
+                    message: `${username} has joined the chat`,
+                    isP2P: true
                 }, p2pConnections);
             } else {
                 ws.send(JSON.stringify({
@@ -204,7 +216,9 @@ wss.on('connection', (ws) => {
                     type: 'message',
                     room: userRoom,
                     username: 'System',
-                    message: `${username} has left the chat`
+                    message: `${username} has left the chat`,
+                    isSecret: isSecretChat,
+                    isP2P: isP2P
                 }, targetRoomMap);
             }
         }
