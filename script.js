@@ -5,11 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatWindow = document.getElementById('chat-window');
     const usernameInput = document.getElementById('username');
     const enterChatButton = document.getElementById('enter-chat');
-    const chatRoomsList = document.getElementById('chat-rooms');
+    const chatRoomButtons = document.getElementById('chat-rooms');
     const messagesDiv = document.getElementById('messages');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     const welcomeHeader = document.getElementById('welcome-header');
+    const roomTitle = document.getElementById('room-title');
 
     let currentRoom = '';
     let username = '';
@@ -37,10 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
         username = usernameInput.value.trim();
         if (username) {
             welcomeHeader.classList.add('slide-out');
-            usernameEntry.classList.add('slide-out');
             setTimeout(() => {
                 welcomeHeader.style.display = 'none';
-                usernameEntry.style.display = 'none';
                 chatRoomSelection.style.display = 'block';
                 chatRoomSelection.classList.add('slide-in');
             }, 300);
@@ -49,24 +48,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    chatRoomsList.addEventListener('click', (event) => {
-        if (event.target.tagName === 'A') {
-            event.preventDefault();
+    // Room selection using buttons
+    chatRoomButtons.addEventListener('click', (event) => {
+        if (event.target.classList.contains('room-button')) {
             currentRoom = event.target.dataset.room;
+            const roomName = event.target.textContent;
             
-            chatRoomSelection.classList.remove('slide-in');
             chatRoomSelection.classList.add('slide-out');
-            
             setTimeout(() => {
                 chatRoomSelection.style.display = 'none';
                 chatWindow.style.display = 'block';
                 chatWindow.classList.add('slide-in');
+                roomTitle.textContent = roomName;
                 
-                // Display welcome message
+                // Display welcome messages
                 messagesDiv.innerHTML = `
-                    <div class="message system-message">Welcome to the ${currentRoom} chat room!</div>
+                    <div class="message system-message">Welcome to ${roomName}!</div>
                     <div class="message system-message">This is a demo version. Messages are simulated.</div>
                 `;
+                
+                // Simulate a bot welcome message
+                setTimeout(() => {
+                    appendMessage('ChatBot', `Welcome ${username}! How can I help you today?`);
+                }, 1000);
             }, 300);
         }
     });

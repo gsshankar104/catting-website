@@ -9,7 +9,6 @@
     <meta property="og:title" content="Catting Website">
     <meta property="og:description" content="Try our modern chat interface">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://gsshankar104.github.io/catting-website/">
 </head>
 <body>
     <div class="container">
@@ -24,13 +23,14 @@
         <main>
             <div id="chat-room-selection" style="display: none;">
                 <h2>Select a Chat Room</h2>
-                <ul id="chat-rooms">
-                    <li><a href="#" data-room="general" id="general-room">General</a></li>
-                    <li><a href="#" data-room="random" id="random-room">Random</a></li>
-                    <li><a href="#" data-room="memes" id="memes-room">Memes</a></li>
-                </ul>
+                <div id="chat-rooms">
+                    <button class="room-button" data-room="general">General Chat</button>
+                    <button class="room-button" data-room="random">Random Talk</button>
+                    <button class="room-button" data-room="memes">Memes & Fun</button>
+                </div>
             </div>
             <div id="chat-window" style="display: none;">
+                <h2 id="room-title"></h2>
                 <div id="messages"></div>
                 <div class="message-input-container">
                     <input type="text" id="message-input" placeholder="Type your message...">
@@ -38,8 +38,6 @@
                 </div>
             </div>
         </main>
-        <footer>
-        </footer>
     </div>
     <script src="script.js"></script>
 </body>
