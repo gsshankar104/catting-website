@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catting Website (Demo Mode)</title>
+    <title>Catting Website</title>
     <link rel="stylesheet" href="style.css">
-    <meta name="description" content="A modern, lightweight chatting website - Demo Mode">
+    <meta name="description" content="A modern, lightweight chatting website">
     <meta property="og:title" content="Catting Website">
     <meta property="og:description" content="Try our modern chat interface">
     <meta property="og:type" content="website">
@@ -22,13 +22,14 @@
         <main>
             <div id="chat-room-selection" style="display: none;">
                 <h2>Select a Chat Room</h2>
-                <ul id="chat-rooms">
-                    <li><a href="#" data-room="general" id="general-room">General</a></li>
-                    <li><a href="#" data-room="random" id="random-room">Random</a></li>
-                    <li><a href="#" data-room="memes" id="memes-room">Memes</a></li>
-                </ul>
+                <div id="chat-rooms">
+                    <button class="room-button" data-room="general">General Chat</button>
+                    <button class="room-button" data-room="random">Random Talk</button>
+                    <button class="room-button" data-room="memes">Memes & Fun</button>
+                </div>
             </div>
             <div id="chat-window" style="display: none;">
+                <h2 id="room-title"></h2>
                 <div id="messages"></div>
                 <div class="message-input-container">
                     <input type="text" id="message-input" placeholder="Type your message...">
@@ -36,8 +37,6 @@
                 </div>
             </div>
         </main>
-        <footer>
-        </footer>
     </div>
     <script src="script.js"></script>
 </body>
