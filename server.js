@@ -91,21 +91,39 @@ wss.on('connection', (ws) => {
         // Determine the room type from the message itself
         if (message.isSecret) {
             targetRoomMap = secretRooms;
+            console.log('Secret message:', { room: message.room, map: 'secretRooms' });
         } else if (message.isP2P) {
             targetRoomMap = p2pConnections;
+            console.log('P2P message:', { room: message.room, map: 'p2pConnections' });
         } else {
             targetRoomMap = rooms;
+            console.log('Public message:', { room: message.room, map: 'rooms' });
         }
 
+        // Only broadcast if the room exists in the correct map
         if (targetRoomMap && targetRoomMap.has(message.room)) {
-            broadcastToRoom(message.room, {
+            console.log('Broadcasting to room:', {
+                room: message.room,
+                type: message.isSecret ? 'secret' : message.isP2P ? 'p2p' : 'public',
+                clients: targetRoomMap.get(message.room).size
+            });
+            
+            // Create a new message object with all necessary properties
+            const broadcastMessage = {
                 type: 'message',
                 room: message.room,
                 username: message.username,
                 message: message.message,
                 isSecret: message.isSecret,
                 isP2P: message.isP2P
-            }, targetRoomMap);
+            };
+
+            broadcastToRoom(message.room, broadcastMessage, targetRoomMap);
+        } else {
+            console.log('Room not found:', {
+                room: message.room,
+                type: message.isSecret ? 'secret' : message.isP2P ? 'p2p' : 'public'
+            });
         }
     }
 

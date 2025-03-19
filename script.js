@@ -59,7 +59,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleServerMessage(data) {
         switch (data.type) {
             case 'message':
-                appendMessage(data.username, data.message);
+                // Only process messages that match our current room type
+                if ((isSecretChat && data.isSecret) ||
+                    (isP2P && data.isP2P) ||
+                    (!isSecretChat && !isP2P && !data.isSecret && !data.isP2P)) {
+                    console.log('Receiving message:', {
+                        room: data.room,
+                        isSecret: data.isSecret,
+                        isP2P: data.isP2P,
+                        currentRoom: currentRoom
+                    });
+                    appendMessage(data.username, data.message);
+                }
                 break;
             case 'secret_created':
                 handleSecretCreated(data);
@@ -218,14 +229,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function joinSecretRoom(roomId) {
         isSecretChat = true;
+        isP2P = false;
         currentRoom = roomId;
         switchToChat('Secret Chat');
         socket.send(JSON.stringify({
             type: 'join_secret',
             roomId: roomId,
-            username: username
+            username: username,
+            isSecret: true
         }));
         roomInfo.textContent = '🔒 This is a private chat room. Messages will be deleted when everyone leaves.';
+        // Clear any previous messages
+        messagesDiv.innerHTML = '';
     }
 
     function joinP2PRoom(roomId) {
