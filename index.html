@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catting Website</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header id="welcome-header">
+            <h1>Welcome to Catting!</h1>
+            <div id="username-entry">
+                <input type="text" id="username" placeholder="Enter your username">
+                <button id="enter-chat">Enter Chat</button>
+            </div>
+        </header>
+        <main>
+            <div id="chat-room-selection" style="display: none;">
+                <h2>Select a Chat Room</h2>
+                <ul id="chat-rooms">
+                    <li><a href="#" data-room="general" id="general-room">General</a></li>
+                    <li><a href="#" data-room="random" id="random-room">Random</a></li>
+                    <li><a href="#" data-room="memes" id="memes-room">Memes</a></li>
+                </ul>
+            </div>
+            <div id="chat-window" style="display: none;">
+                <div id="messages"></div>
+                <div class="message-input-container">
+                    <input type="text" id="message-input" placeholder="Type your message...">
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </main>
+        <footer>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
