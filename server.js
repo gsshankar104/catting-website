@@ -23,7 +23,7 @@ function generateRoomId() {
     return crypto.randomBytes(8).toString('hex');
 }
 
-// Generate P2P invitation code (shorter and more user-friendly)
+// Generate P2P invitation code
 function generateInviteCode() {
     return crypto.randomBytes(3).toString('hex').toUpperCase();
 }
@@ -67,26 +67,36 @@ wss.on('connection', (ws) => {
     function handleJoin(message) {
         userRoom = message.room;
         username = message.username;
+        isSecretChat = !!message.isSecret;
+        isP2P = !!message.isP2P;
 
-        // For public rooms
-        if (!message.isSecret && !message.isP2P) {
+        if (!isSecretChat && !isP2P) {
             if (!rooms.has(userRoom)) {
                 rooms.set(userRoom, new Set());
             }
             rooms.get(userRoom).add(ws);
+            
+            // Send join message only for public rooms
+            broadcastToRoom(userRoom, {
+                type: 'message',
+                room: userRoom,
+                username: 'System',
+                message: `${username} has joined the chat`
+            }, rooms);
         }
-
-        broadcastToRoom(userRoom, {
-            type: 'message',
-            room: userRoom,
-            username: 'System',
-            message: `${username} has joined the chat`
-        });
     }
 
     function handleMessage(message) {
-        const roomMap = isSecretChat ? secretRooms : isP2P ? p2pConnections : rooms;
-        broadcastToRoom(message.room, message, roomMap);
+        let targetRoomMap;
+        if (isSecretChat) {
+            targetRoomMap = secretRooms;
+        } else if (isP2P) {
+            targetRoomMap = p2pConnections;
+        } else {
+            targetRoomMap = rooms;
+        }
+
+        broadcastToRoom(message.room, message, targetRoomMap);
     }
 
     function handleCreateSecret() {
@@ -108,7 +118,7 @@ wss.on('connection', (ws) => {
             isSecretChat = true;
             userRoom = roomId;
             username = message.username;
-            
+
             broadcastToRoom(roomId, {
                 type: 'message',
                 room: roomId,
@@ -144,12 +154,13 @@ wss.on('connection', (ws) => {
                 peers.add(ws);
                 isP2P = true;
                 userRoom = message.roomId;
+                username = message.username;
 
                 broadcastToRoom(message.roomId, {
                     type: 'message',
                     room: message.roomId,
                     username: 'System',
-                    message: `${message.username} has joined the chat`
+                    message: `${username} has joined the chat`
                 }, p2pConnections);
             } else {
                 ws.send(JSON.stringify({
@@ -171,45 +182,30 @@ wss.on('connection', (ws) => {
     });
 
     function handleDisconnect() {
-        if (userRoom) {
-            if (isP2P && p2pConnections.has(userRoom)) {
-                const peers = p2pConnections.get(userRoom);
-                peers.delete(ws);
-                if (peers.size === 0) {
-                    p2pConnections.delete(userRoom);
-                } else {
-                    broadcastToRoom(userRoom, {
-                        type: 'message',
-                        room: userRoom,
-                        username: 'System',
-                        message: `${username} has left the chat`
-                    }, p2pConnections);
-                }
-            } else if (isSecretChat && secretRooms.has(userRoom)) {
-                const room = secretRooms.get(userRoom);
-                room.delete(ws);
-                if (room.size === 0) {
-                    secretRooms.delete(userRoom);
-                } else {
-                    broadcastToRoom(userRoom, {
-                        type: 'message',
-                        room: userRoom,
-                        username: 'System',
-                        message: `${username} has left the chat`
-                    }, secretRooms);
-                }
-            } else if (rooms.has(userRoom)) {
-                rooms.get(userRoom).delete(ws);
-                if (rooms.get(userRoom).size === 0) {
-                    rooms.delete(userRoom);
-                } else {
-                    broadcastToRoom(userRoom, {
-                        type: 'message',
-                        room: userRoom,
-                        username: 'System',
-                        message: `${username} has left the chat`
-                    });
-                }
+        if (!userRoom) return;
+
+        let targetRoomMap;
+        if (isSecretChat) {
+            targetRoomMap = secretRooms;
+        } else if (isP2P) {
+            targetRoomMap = p2pConnections;
+        } else {
+            targetRoomMap = rooms;
+        }
+
+        if (targetRoomMap.has(userRoom)) {
+            const room = targetRoomMap.get(userRoom);
+            room.delete(ws);
+
+            if (room.size === 0) {
+                targetRoomMap.delete(userRoom);
+            } else {
+                broadcastToRoom(userRoom, {
+                    type: 'message',
+                    room: userRoom,
+                    username: 'System',
+                    message: `${username} has left the chat`
+                }, targetRoomMap);
             }
         }
     }
@@ -219,23 +215,23 @@ wss.on('connection', (ws) => {
     });
 });
 
-// Function to broadcast messages to all clients in a room
-function broadcastToRoom(room, message, roomMap = rooms) {
-    if (roomMap.has(room)) {
-        const messageStr = JSON.stringify(message);
-        roomMap.get(room).forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(messageStr);
-            }
-        });
-    }
+function broadcastToRoom(room, message, roomMap) {
+    if (!roomMap || !roomMap.has(room)) return;
+
+    const messageStr = JSON.stringify(message);
+    const clients = roomMap.get(room);
+    
+    clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(messageStr);
+        }
+    });
 }
 
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 
-// Handle server shutdown gracefully
 process.on('SIGINT', () => {
     server.close(() => {
         console.log('Server stopped');
