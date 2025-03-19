@@ -20,6 +20,7 @@ app.use(express.static(__dirname));
 const publicRooms = new Map();
 const secretRooms = new Map();
 const p2pRooms = new Map();
+const p2pInviteCodes = new Map(); // Map invite codes to room IDs
 
 const PORT = process.env.PORT || 3000;
 
@@ -115,7 +116,6 @@ function handleConnection(ws, roomMap, isSecret, isP2P) {
         roomMap.get(userRoom).add(ws);
         
         if (!isSecret && !isP2P) {
-            // Only send join messages in public rooms
             broadcastToRoom(userRoom, {
                 type: 'message',
                 room: userRoom,
@@ -177,8 +177,14 @@ function handleConnection(ws, roomMap, isSecret, isP2P) {
     function handleCreateP2P(ws) {
         const inviteCode = generateInviteCode();
         const roomId = generateRoomId();
+        
+        // Store both the room and the invite code mapping
         p2pRooms.set(roomId, new Set([ws]));
+        p2pInviteCodes.set(inviteCode, roomId);
+        
         userRoom = roomId;
+        
+        console.log(`Created P2P room: ${roomId} with code: ${inviteCode}`);
 
         ws.send(JSON.stringify({
             type: 'p2p_created',
@@ -188,21 +194,37 @@ function handleConnection(ws, roomMap, isSecret, isP2P) {
     }
 
     function handleJoinP2P(ws, message) {
-        if (p2pRooms.has(message.roomId)) {
-            const peers = p2pRooms.get(message.roomId);
+        const inviteCode = message.inviteCode;
+        const roomId = p2pInviteCodes.get(inviteCode);
+        
+        console.log(`Attempting to join P2P room with code: ${inviteCode}, found room: ${roomId}`);
+        
+        if (roomId && p2pRooms.has(roomId)) {
+            const peers = p2pRooms.get(roomId);
             if (peers.size < 2) {
                 peers.add(ws);
-                userRoom = message.roomId;
+                userRoom = roomId;
                 username = message.username;
 
-                broadcastToRoom(message.roomId, {
+                // Send success message back to joining user
+                ws.send(JSON.stringify({
+                    type: 'join_success',
+                    roomId: roomId
+                }));
+
+                broadcastToRoom(roomId, {
                     type: 'message',
-                    room: message.roomId,
+                    room: roomId,
                     username: 'System',
                     message: `${username} has joined the chat`,
                     isP2P: true,
                     sender: ws
                 }, p2pRooms);
+
+                // Clean up invite code after successful join
+                if (peers.size === 2) {
+                    p2pInviteCodes.delete(inviteCode);
+                }
             } else {
                 ws.send(JSON.stringify({
                     type: 'error',
@@ -231,6 +253,14 @@ function handleConnection(ws, roomMap, isSecret, isP2P) {
 
             if (room.size === 0) {
                 roomMap.delete(userRoom);
+                // Clean up invite codes for P2P rooms
+                if (isP2P) {
+                    for (const [code, rid] of p2pInviteCodes.entries()) {
+                        if (rid === userRoom) {
+                            p2pInviteCodes.delete(code);
+                        }
+                    }
+                }
             } else if (!isSecret && !isP2P) {
                 // Only send leave messages in public rooms
                 broadcastToRoom(userRoom, {
