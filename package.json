@@ -1,15 +1,19 @@
 {
   "name": "catting-website",
   "version": "1.0.0",
-  "description": "",
-  "main": "script.js",
+  "description": "Real-time chat application",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["chat", "websocket", "real-time"],
+  "author": "gsshankar104",
   "license": "ISC",
+  "engines": {
+    "node": ">=14"
+  },
   "dependencies": {
     "express": "^4.21.2",
     "ws": "^8.18.1"

@@ -7,3 +7,9 @@ services:
     envVars:
       - key: PORT
         value: 10000
+    routes:
+      - type: web
+        plan: free
+    github:
+      branch: main
+      deploy: true
