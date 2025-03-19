@@ -69,7 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'message':
                 // Only process messages that match our current room
                 if (data.room === currentRoom) {
-                    appendMessage(data.username, data.message);
+                    // Don't show incoming messages if we sent them
+                    if (data.username !== username) {
+                        appendMessage(data.username, data.message);
+                    }
                 }
                 break;
             case 'secret_created':
@@ -215,11 +218,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSocket.send(JSON.stringify(messageData));
             messageInput.value = '';
             
-            // Only show message immediately in public chat
-            // For secret/P2P chats, wait for server echo
-            if (!isSecretChat && !isP2P) {
-                appendMessage(username, messageText);
-            }
+            // Show our own messages immediately
+            appendMessage(username, messageText);
         }
     };
 
