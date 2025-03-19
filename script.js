@@ -13,33 +13,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomTitle = document.getElementById('room-title');
 
     let currentRoom = '';
+    //let currentRoom = '';
     let username = '';
 
-    // Bot responses
-    const botResponses = [
-        "Hey! How are you?",
-        "That's interesting!",
-        "Tell me more about that.",
-        "I understand what you mean.",
-        "Great point!",
-        "Thanks for sharing!",
-        "What do you think about that?",
-        "I agree with you!",
-        "That's a good perspective.",
-        "Let's continue this discussion!"
-    ];
+    // Initialize WebSocket connection
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : window.location.host;
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}`);
 
-    function getRandomBotResponse() {
-        return botResponses[Math.floor(Math.random() * botResponses.length)];
-    }
+    // WebSocket event handlers
+    socket.addEventListener('open', () => {
+        console.log('Connected to WebSocket server');
+    });
+
+    socket.addEventListener('close', () => {
+        console.log('Disconnected from WebSocket server');
+        messagesDiv.innerHTML += '<div class="message">Disconnected from server. Please refresh the page.</div>';
+    });
+
+    socket.addEventListener('error', (error) => {
+        console.error('WebSocket error:', error);
+    });
+
+    socket.addEventListener('message', (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.room === currentRoom) {
+                appendMessage(data.username, data.message);
+            }
+        } catch (error) {
+            console.error('Error parsing message:', error);
+        }
+    });
 
     // Event Listeners
     enterChatButton.addEventListener('click', () => {
         username = usernameInput.value.trim();
         if (username) {
             welcomeHeader.classList.add('slide-out');
+            usernameEntry.classList.add('slide-out');
             setTimeout(() => {
                 welcomeHeader.style.display = 'none';
+                usernameEntry.style.display = 'none';
                 chatRoomSelection.style.display = 'block';
                 chatRoomSelection.classList.add('slide-in');
             }, 300);
@@ -53,24 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target.classList.contains('room-button')) {
             currentRoom = event.target.dataset.room;
             const roomName = event.target.textContent;
-            
+
             chatRoomSelection.classList.add('slide-out');
             setTimeout(() => {
                 chatRoomSelection.style.display = 'none';
                 chatWindow.style.display = 'block';
                 chatWindow.classList.add('slide-in');
                 roomTitle.textContent = roomName;
-                
-                // Display welcome messages
-                messagesDiv.innerHTML = `
-                    <div class="message system-message">Welcome to ${roomName}!</div>
-                    <div class="message system-message">This is a demo version. Messages are simulated.</div>
-                `;
-                
-                // Simulate a bot welcome message
-                setTimeout(() => {
-                    appendMessage('ChatBot', `Welcome ${username}! How can I help you today?`);
-                }, 1000);
             }, 300);
         }
     });
@@ -79,15 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendMessage = () => {
         const messageText = messageInput.value.trim();
         if (messageText && currentRoom) {
-            // Show user message
-            appendMessage(username, messageText);
+            const messageData = {
+                type: 'message',
+                room: currentRoom,
+                username: username,
+                message: messageText
+            };
+            socket.send(JSON.stringify(messageData));
             messageInput.value = '';
-
-            // Simulate bot response
-            setTimeout(() => {
-                const botName = "ChatBot";
-                appendMessage(botName, getRandomBotResponse());
-            }, 1000);
         }
     };
 
