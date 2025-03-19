@@ -22,14 +22,70 @@
         <main>
             <div id="chat-room-selection" style="display: none;">
                 <h2>Select a Chat Room</h2>
-                <div id="chat-rooms">
-                    <button class="room-button" data-room="general">General Chat</button>
-                    <button class="room-button" data-room="random">Random Talk</button>
-                    <button class="room-button" data-room="memes">Memes & Fun</button>
+                <div class="room-section public-rooms">
+                    <h3>Public Chat Rooms</h3>
+                    <div id="chat-rooms">
+                        <button class="room-button" data-room="general">General Chat</button>
+                        <button class="room-button" data-room="random">Random Talk</button>
+                        <button class="room-button" data-room="memes">Memes & Fun</button>
+                    </div>
+                </div>
+                <div class="room-section secret-rooms">
+                    <h3>Secret Chats</h3>
+                    <div id="secret-options">
+                        <button id="create-secret-chat" class="secret-button">
+                            <span class="icon">🔒</span>
+                            Create Secret Chat
+                        </button>
+                        <button id="create-p2p-chat" class="secret-button">
+                            <span class="icon">👥</span>
+                            Start P2P Chat
+                        </button>
+                        <button id="join-secret-chat" class="secret-button">
+                            <span class="icon">🔑</span>
+                            Join Secret Chat
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            <!-- Secret Chat Creation Modal -->
+            <div id="secret-chat-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <h3>Create Secret Chat</h3>
+                    <p>Share this link with your friend:</p>
+                    <div class="share-link-container">
+                        <input type="text" id="share-link" readonly>
+                        <button id="copy-link">Copy</button>
+                    </div>
+                    <button id="close-modal" class="close-button">Close</button>
+                </div>
+            </div>
+
+            <!-- P2P Chat Modal -->
+            <div id="p2p-chat-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <h3>P2P Chat</h3>
+                    <div id="p2p-initiator" style="display: none;">
+                        <p>Your invite code:</p>
+                        <div class="invite-code-container">
+                            <input type="text" id="invite-code" readonly>
+                            <button id="copy-code">Copy</button>
+                        </div>
+                        <p class="help-text">Share this code with your friend</p>
+                    </div>
+                    <div id="p2p-joiner" style="display: none;">
+                        <p>Enter invite code:</p>
+                        <input type="text" id="join-code" placeholder="Enter code here">
+                        <button id="join-p2p">Join Chat</button>
+                    </div>
+                    <button class="close-button">Close</button>
+                </div>
+            </div>
+
             <div id="chat-window" style="display: none;">
                 <h2 id="room-title"></h2>
+                <div id="room-info"></div>
                 <div id="messages"></div>
                 <div class="message-input-container">
                     <input type="text" id="message-input" placeholder="Type your message...">
