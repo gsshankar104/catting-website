@@ -57,22 +57,22 @@ server.on('upgrade', (request, socket, head) => {
 // Handle public chat connections
 publicWss.on('connection', (ws) => {
     console.log('Client connected to public chat');
-    handleConnection(ws, publicRooms);
+    handleConnection(ws, publicRooms, false, false);
 });
 
 // Handle secret chat connections
 secretWss.on('connection', (ws) => {
     console.log('Client connected to secret chat');
-    handleConnection(ws, secretRooms);
+    handleConnection(ws, secretRooms, true, false);
 });
 
 // Handle P2P chat connections
 p2pWss.on('connection', (ws) => {
     console.log('Client connected to P2P chat');
-    handleConnection(ws, p2pRooms);
+    handleConnection(ws, p2pRooms, false, true);
 });
 
-function handleConnection(ws, roomMap) {
+function handleConnection(ws, roomMap, isSecret, isP2P) {
     let userRoom = '';
     let username = '';
 
@@ -85,7 +85,7 @@ function handleConnection(ws, roomMap) {
                     handleJoin(ws, message, roomMap);
                     break;
                 case 'message':
-                    handleMessage(ws, message, roomMap);
+                    handleMessage(ws, message, roomMap, isSecret, isP2P);
                     break;
                 case 'create_secret':
                     handleCreateSecret(ws);
@@ -114,21 +114,28 @@ function handleConnection(ws, roomMap) {
         }
         roomMap.get(userRoom).add(ws);
         
-        broadcastToRoom(userRoom, {
-            type: 'message',
-            room: userRoom,
-            username: 'System',
-            message: `${username} has joined the chat`
-        }, roomMap);
+        if (!isSecret && !isP2P) {
+            // Only send join messages in public rooms
+            broadcastToRoom(userRoom, {
+                type: 'message',
+                room: userRoom,
+                username: 'System',
+                message: `${username} has joined the chat`,
+                sender: ws
+            }, roomMap);
+        }
     }
 
-    function handleMessage(ws, message, roomMap) {
+    function handleMessage(ws, message, roomMap, isSecret, isP2P) {
         if (roomMap.has(message.room)) {
             broadcastToRoom(message.room, {
                 type: 'message',
                 room: message.room,
                 username: message.username,
-                message: message.message
+                message: message.message,
+                isSecret: isSecret,
+                isP2P: isP2P,
+                sender: ws
             }, roomMap);
         }
     }
@@ -155,7 +162,9 @@ function handleConnection(ws, roomMap) {
                 type: 'message',
                 room: roomId,
                 username: 'System',
-                message: `${username} has joined the secret chat`
+                message: `${username} has joined the secret chat`,
+                isSecret: true,
+                sender: ws
             }, secretRooms);
         } else {
             ws.send(JSON.stringify({
@@ -190,7 +199,9 @@ function handleConnection(ws, roomMap) {
                     type: 'message',
                     room: message.roomId,
                     username: 'System',
-                    message: `${username} has joined the chat`
+                    message: `${username} has joined the chat`,
+                    isP2P: true,
+                    sender: ws
                 }, p2pRooms);
             } else {
                 ws.send(JSON.stringify({
@@ -220,12 +231,14 @@ function handleConnection(ws, roomMap) {
 
             if (room.size === 0) {
                 roomMap.delete(userRoom);
-            } else {
+            } else if (!isSecret && !isP2P) {
+                // Only send leave messages in public rooms
                 broadcastToRoom(userRoom, {
                     type: 'message',
                     room: userRoom,
                     username: 'System',
-                    message: `${username} has left the chat`
+                    message: `${username} has left the chat`,
+                    sender: ws
                 }, roomMap);
             }
         }
@@ -241,9 +254,10 @@ function broadcastToRoom(room, message, roomMap) {
 
     const messageStr = JSON.stringify(message);
     const clients = roomMap.get(room);
+    const sender = message.sender;
     
     clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
+        if (client !== sender && client.readyState === WebSocket.OPEN) {
             client.send(messageStr);
         }
     });
